@@ -138,7 +138,7 @@ namespace ReferencesRevision
             {
                 for (var j = 0; j < myReallyBigMatrix.GetLength(1); j++)
                 {
-                    Console.Write($"{myReallyBigMatrix[i,j]:000}, ");
+                    Console.Write($"{myReallyBigMatrix[i,j]:00}, ");
                 }
                 Console.WriteLine();
             }
