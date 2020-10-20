@@ -24,11 +24,9 @@ namespace NullableIntroductionExamplesStart.Requests
         }
     }
     
-    
-
     public class RequestAuthorizationService
     {
-        public Request CanView([MaybeNull] Request request)
+        public Request CanView(Request request)
         {
             if (!IsAuthorized())
                 return null;
