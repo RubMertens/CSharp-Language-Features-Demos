@@ -17,12 +17,13 @@ namespace NullableIntroductionExamples.Requests
 
         public IEnumerable<Request> RequestForPerson(int personId)
         {
-            return requests
-                .Where(r => r.Target == personId)
-                .Select(r => authorizationService.CanView(r))
-                .Where(r => r !=null)
-                .Select(r => r!)
-                ;
+            foreach (var request in requests)
+            {
+                authorizationService.Authorize(request);
+                if(request == null)
+                    continue;
+                yield return request;
+            }
         }
     }
     
@@ -30,15 +31,14 @@ namespace NullableIntroductionExamples.Requests
 
     public class RequestAuthorizationService
     {
-        public Request? CanView([MaybeNull] Request request)
+        public void Authorize([MaybeNull] Request request)
         {
             if (!IsAuthorized())
-                return null;
+                request = null;
 
             if (!CanViewComments())
-                request.Comment = new OptionalComment(null);
-            
-            return request;
+                if (request != null)
+                    request.Comment = new OptionalComment(null);
         }
 
         public bool CanViewComments()
