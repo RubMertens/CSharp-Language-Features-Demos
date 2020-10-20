@@ -69,12 +69,12 @@ namespace SwitchExpressionDemos._02TupleBased
         private static (LightState current, LightState previous, int flashCount) GetNextState(LightState current, LightState previous, int flashCount = 0) =>
             (current, previous, flashCount) switch
             {
-                (Item1: LightState.Red,_,_) => (LightState.Orange, current,0),
-                (Item1: LightState.Orange, Item2: LightState.Red,_) => (LightState.Green, current,0),
-                (Item1: LightState.Green, _,_) => (LightState.FlashingGreen, current,0),
-                (Item1: LightState.FlashingGreen, _,Item3:2 ) => (LightState.Orange, current,0),
-                (Item1: LightState.FlashingGreen, _,_ ) => (LightState.FlashingGreen, current,flashCount+1),
-                (Item1: LightState.Orange, Item2: LightState.FlashingGreen,_) => (LightState.Red, current,0),
+                (current: LightState.Red,_,_) => (LightState.Orange, current,0),
+                (current: LightState.Orange, previous: LightState.Red,_) => (LightState.Green, current,0),
+                (current: LightState.Green, _,_) => (LightState.FlashingGreen, current,0),
+                (current: LightState.FlashingGreen, _,flashCount:2 ) => (LightState.Orange, current,0),
+                (current: LightState.FlashingGreen, _,_ ) => (LightState.FlashingGreen, current,flashCount+1),
+                (current: LightState.Orange, previous: LightState.FlashingGreen,_) => (LightState.Red, current,0),
                 _ => (LightState.FlashingOrange, current,0)
             };
     }

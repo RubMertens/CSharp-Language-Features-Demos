@@ -2,6 +2,9 @@ namespace SwitchExpressionDemos.Ui
 {
     public static class ConsoleTrafficLight
     {
+        public static int Width = 32;
+        public static int Height = 20;
+        
         public static string Green => 
             @"
                 ##

@@ -18,12 +18,23 @@ namespace RefStructs
     {
         static void Main(string[] args)
         {
-            SpanOverArray();
-            // SpansFromDifferentPlaces();
+            //SpanOverArray();
+             // SpansFromDifferentPlaces();
             // BenchmarkRunner.Run<StringSum>();
-            // Ranges();
+            Ranges();
         }
-
+        
+        public struct LivesWithItsValues
+        {
+                        
+        }
+        
+        // public ref struct MySpan<T>
+        // {
+        //     public int Length;
+        //     public ref T Value;
+        // }
+        
         private static void SpanOverArray()
         {
             var arr = new[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -40,12 +51,6 @@ namespace RefStructs
             Console.WriteLine(string.Join("," ,arr));
         }
         
-        // public ref struct MySpan<T>
-        // {
-        //     public int Length;
-        //     public ref T Value;
-        // }
-
         private static void SpansFromDifferentPlaces()
         {
             //from array 
@@ -71,7 +76,11 @@ namespace RefStructs
 
         private static void PrintSpan(Span<int> sp)
         {
-            Console.WriteLine(string.Join(",", sp.ToArray()));
+            foreach (var n in sp)
+            {
+                Console.Write($"{n},");
+            }
+            Console.WriteLine();
         }
 
         private static void Ranges()
@@ -93,9 +102,11 @@ namespace RefStructs
             var range= words[new Range(new Index(0), new Index(2))];
             Console.WriteLine(string.Join(" ", range));
             range = words[0..2];
-            var r = 0..2;
             Console.WriteLine(string.Join(" ", range));
-            
+            var r = 0..2;
+            range = words[r];
+            Console.WriteLine(string.Join(" ", range));
+
             //open ended range
             range = words[3..];
             Console.WriteLine(string.Join(" ", range));
@@ -134,6 +145,9 @@ namespace RefStructs
         public static string data = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15";
 
         [Benchmark]
+        /* naive result
+         * |     StringParseSum | 4.539 us | 0.0644 us | 0.0632 us | 4.544 us | 1.1368 |     - |     - |    4776 B |
+         */
         public int StringParseSum()
         {
             var sum = 0;
@@ -147,6 +161,9 @@ namespace RefStructs
         }
         
         [Benchmark]
+        /* span result
+         * |       SpanParseSum | 2.171 us | 0.0182 us | 0.0152 us | 2.172 us |      - |     - |     - |         - |
+         */
         public int SpanParseSum()
         {
             var span = data.AsSpan();
@@ -169,6 +186,9 @@ namespace RefStructs
         }
         
         [Benchmark]
+        /* utf8 span result
+         * |   SpanParseUtf8Sum | 1.040 us | 0.0060 us | 0.0057 us | 1.038 us | 0.0839 |     - |     - |     352 B |
+         */
         public int SpanParseUtf8Sum()
         {
             ReadOnlySpan<byte> bytes = Encoding.UTF8.GetBytes(data);
@@ -187,12 +207,15 @@ namespace RefStructs
         }
         
         [Benchmark]
+        /* UTF8 Memory Pool result
+         * | Utf8WithMemoryPool | 1.073 us | 0.0138 us | 0.0122 us | 1.072 us | 0.0057 |     - |     - |      24 B |
+         */
         public int Utf8WithMemoryPool()
         {
             //get minimal length required for 
             var minLength = UTF8Encoding.UTF8.GetMaxByteCount(data.Length); 
             // var arr = ArrayPool<byte>.Shared.Rent(minLength);
-            var owner = MemoryPool<byte>.Shared.Rent(minLength);
+            IMemoryOwner<byte> owner = MemoryPool<byte>.Shared.Rent(minLength);
             
             var utf8 = owner.Memory.Span;
             var bytesWritten = UTF8Encoding.UTF8.GetBytes(data, utf8);
@@ -214,6 +237,9 @@ namespace RefStructs
         }
         
         [Benchmark]
+        /* UTF8 ArrayPool result
+         * |  Utf8WithArrayPool | 1.095 us | 0.0215 us | 0.0593 us | 1.066 us |      - |     - |     - |         - |
+         */
         public int Utf8WithArrayPool()
         {
             //get minimal length required for 

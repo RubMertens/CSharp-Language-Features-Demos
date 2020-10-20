@@ -18,6 +18,7 @@ namespace SwitchExpressionDemos._01Basic
         }
         
         private static void PrintLight(LightState state){
+            //inline
             switch(state)
             {
                 case LightState.Off:
