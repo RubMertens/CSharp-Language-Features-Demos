@@ -23,7 +23,7 @@ namespace NullableIntroductionExamplesStart.Requests
             if (request.Comment.HasComment())
             {
                 var notification = new Notification(
-                    request.Comment.Comment!,
+                    request.Comment.Comment,
                     request.Target
                 );
                 notificationService.SendMessage(notification);
