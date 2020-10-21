@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Buffers;
 using System.Buffers.Text;
-using System.Collections;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.NetworkInformation;
-using System.Reflection.Metadata.Ecma335;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Running;
-using Microsoft.Diagnostics.Tracing.Parsers.IIS_Trace;
+using Microsoft.Diagnostics.Tracing;
 
 namespace RefStructs
 {
@@ -18,17 +15,15 @@ namespace RefStructs
     {
         static void Main(string[] args)
         {
-            //SpanOverArray();
+            SpanOverArray();
              // SpansFromDifferentPlaces();
             // BenchmarkRunner.Run<StringSum>();
-            Ranges();
+            // AsyncExamples();
+            // Ranges();
         }
         
-        public struct LivesWithItsValues
-        {
-                        
-        }
         
+
         // public ref struct MySpan<T>
         // {
         //     public int Length;
@@ -83,6 +78,59 @@ namespace RefStructs
             Console.WriteLine();
         }
 
+        private static async Task AsyncExamples()
+        {
+            Console.WriteLine(await RequestRemotelyAndProcess());
+            Console.WriteLine(await RequestRemotelyAndProcessWithSpan());
+            Console.WriteLine(await RequestRemotelyAndProcessWithSpanLocalFunction());
+        }
+
+        private static async Task<int> RequestRemotelyAndProcess()
+        {
+            var bytes = await RemoteCall();
+            var sum = 0;
+            foreach (var b in bytes)
+            {
+                sum += b;
+            }
+            return sum;
+        }
+
+        private static Task<byte[]> RemoteCall()
+        {
+            return Task.FromResult(new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 128});
+        }
+
+        private static async Task<int> RequestRemotelyAndProcessWithSpan()
+        {
+            var bytes = await RemoteCall();
+            return SumBytes(bytes);
+        }
+
+        private static int SumBytes(ReadOnlySpan<byte> bytes)
+        {
+            var sum = 0;
+            foreach (var b in bytes)
+            {
+                sum += b;
+            }
+            return sum;
+        }
+        
+        private static async Task<int> RequestRemotelyAndProcessWithSpanLocalFunction()
+        {
+            var bytes = await RemoteCall();
+            static int SumBytesLocal(ReadOnlySpan<byte> localFunctionBytes) {
+                var sum = 0;
+                foreach (var b in localFunctionBytes)
+                {
+                    sum += b;
+                }
+                return sum;
+            }
+            return SumBytesLocal(bytes);
+        }
+        
         private static void Ranges()
         {
             string[] words = new string[]
