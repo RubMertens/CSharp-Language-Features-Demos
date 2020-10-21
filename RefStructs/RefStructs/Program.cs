@@ -2,11 +2,14 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Running;
 using Microsoft.Diagnostics.Tracing;
 
 namespace RefStructs
@@ -15,9 +18,9 @@ namespace RefStructs
     {
         static void Main(string[] args)
         {
-            SpanOverArray();
+            // SpanOverArray();
              // SpansFromDifferentPlaces();
-            // BenchmarkRunner.Run<StringSum>();
+            BenchmarkRunner.Run<StringSum>();
             // AsyncExamples();
             // Ranges();
         }
@@ -94,6 +97,91 @@ namespace RefStructs
                 sum += b;
             }
             return sum;
+        }
+
+        private static Task<int> AsyncCompilerExample()
+        {
+            var stateMachine = new RequestRemotelyAndProcessStateMachine();
+            stateMachine.builder = AsyncTaskMethodBuilder<int>.Create();
+            stateMachine.state = -1;
+            stateMachine.builder.Start(ref stateMachine);
+            return stateMachine.builder.Task;
+        }
+        
+        //loosely taken from ILSPY set to lower the language version to c# 4
+        private class RequestRemotelyAndProcessStateMachine: IAsyncStateMachine
+        {
+            public AsyncTaskMethodBuilder<int> builder;
+            public int state;
+
+
+            public byte[] bytes_awaiterResult;
+            public byte[] bytes;
+            public byte b;
+            public int i;
+            public byte[] bytesCopy;
+            public int sum;
+
+            private TaskAwaiter<byte[]> bytesTaskAwaiter;
+
+            public void MoveNext()
+            {
+                int num = state;
+                int result;
+                try
+                {
+                    TaskAwaiter<byte[]> awaiter;
+                    if (num != 0)
+                    {
+                        awaiter = RemoteCall().GetAwaiter();
+                        if (!awaiter.IsCompleted)
+                        {
+                            num = (state = 0);
+                            bytesTaskAwaiter = awaiter;
+                            var stateMachine = this;
+                            builder.AwaitUnsafeOnCompleted(ref awaiter, ref stateMachine);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        awaiter = bytesTaskAwaiter;
+                        bytesTaskAwaiter = default(TaskAwaiter<byte[]>);
+                        num = (state = -1);
+                    }
+                    
+                    this.bytes_awaiterResult = awaiter.GetResult();
+                    bytesCopy = bytes_awaiterResult;
+                    bytes_awaiterResult = null;
+                    sum = 0;
+                    bytes = bytesCopy;
+                    
+                    for (i = 0; i < bytes.Length; i++)
+                    {
+                        b = bytes[i];
+                        sum += b;
+                    }
+
+                    bytes = null;
+                    result = sum;
+                }
+                catch (Exception exception)
+                {
+                    // <>1__state = -2;
+                    //     <bytes>5__1 = null;
+                    //     <>t__builder.SetException(exception);
+                    // handle exceptions
+                    return;
+                }
+
+                state = -2;
+                bytesCopy = null;
+                builder.SetResult(result);            
+            }
+
+            public void SetStateMachine(IAsyncStateMachine stateMachine)
+            {
+            }
         }
 
         private static Task<byte[]> RemoteCall()
@@ -179,13 +267,15 @@ namespace RefStructs
     }
 
 /*
-|             Method |     Mean |     Error |    StdDev |   Median |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|----------:|----------:|---------:|-------:|------:|------:|----------:|
-|     StringParseSum | 4.539 us | 0.0644 us | 0.0632 us | 4.544 us | 1.1368 |     - |     - |    4776 B |
-|       SpanParseSum | 2.171 us | 0.0182 us | 0.0152 us | 2.172 us |      - |     - |     - |         - |
-|   SpanParseUtf8Sum | 1.040 us | 0.0060 us | 0.0057 us | 1.038 us | 0.0839 |     - |     - |     352 B |
-| Utf8WithMemoryPool | 1.073 us | 0.0138 us | 0.0122 us | 1.072 us | 0.0057 |     - |     - |      24 B |
-|  Utf8WithArrayPool | 1.095 us | 0.0215 us | 0.0593 us | 1.066 us |      - |     - |     - |         - |
+|             Method |       Mean |     Error |    StdDev |     Median |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------- |-----------:|----------:|----------:|-----------:|-------:|------:|------:|----------:|
+|     StringParseSum | 4,163.3 ns |  81.70 ns |  72.43 ns | 4,153.6 ns | 1.1368 |     - |     - |    4776 B |
+|       LinqParseSum | 5,358.4 ns | 105.59 ns | 195.73 ns | 5,268.2 ns | 1.1597 |     - |     - |    4872 B |
+|       SpanParseSum | 2,116.7 ns |  19.73 ns |  17.49 ns | 2,116.2 ns |      - |     - |     - |         - |
+|   SpanParseUtf8Sum |   980.4 ns |  15.65 ns |  13.88 ns |   980.1 ns | 0.0839 |     - |     - |     352 B |
+| Utf8WithMemoryPool | 1,022.4 ns |   9.61 ns |   8.52 ns | 1,020.2 ns | 0.0057 |     - |     - |      24 B |
+|  Utf8WithArrayPool | 1,063.9 ns |  28.67 ns |  83.17 ns | 1,013.3 ns |      - |     - |     - |         - |
+
 */
     [MemoryDiagnoser]
     public class StringSum
@@ -194,7 +284,7 @@ namespace RefStructs
 
         [Benchmark]
         /* naive result
-         * |     StringParseSum | 4.539 us | 0.0644 us | 0.0632 us | 4.544 us | 1.1368 |     - |     - |    4776 B |
+         * |     StringParseSum | 4,163.3 ns |  81.70 ns |  72.43 ns | 4,153.6 ns | 1.1368 |     - |     - |    4776 B |
          */
         public int StringParseSum()
         {
@@ -207,10 +297,18 @@ namespace RefStructs
 
             return sum;
         }
+        [Benchmark]
+        /* linq result
+         * |       LinqParseSum | 5,358.4 ns | 105.59 ns | 195.73 ns | 5,268.2 ns | 1.1597 |     - |     - |    4872 B |
+         */
+        public int LinqParseSum()
+        {
+            return data.Split(',').Sum(int.Parse);
+        }
         
         [Benchmark]
         /* span result
-         * |       SpanParseSum | 2.171 us | 0.0182 us | 0.0152 us | 2.172 us |      - |     - |     - |         - |
+         * |       SpanParseSum | 2,116.7 ns |  19.73 ns |  17.49 ns | 2,116.2 ns |      - |     - |     - |         - |
          */
         public int SpanParseSum()
         {
@@ -235,7 +333,7 @@ namespace RefStructs
         
         [Benchmark]
         /* utf8 span result
-         * |   SpanParseUtf8Sum | 1.040 us | 0.0060 us | 0.0057 us | 1.038 us | 0.0839 |     - |     - |     352 B |
+         * |   SpanParseUtf8Sum |   980.4 ns |  15.65 ns |  13.88 ns |   980.1 ns | 0.0839 |     - |     - |     352 B |
          */
         public int SpanParseUtf8Sum()
         {
@@ -256,7 +354,7 @@ namespace RefStructs
         
         [Benchmark]
         /* UTF8 Memory Pool result
-         * | Utf8WithMemoryPool | 1.073 us | 0.0138 us | 0.0122 us | 1.072 us | 0.0057 |     - |     - |      24 B |
+         * | Utf8WithMemoryPool | 1,022.4 ns |   9.61 ns |   8.52 ns | 1,020.2 ns | 0.0057 |     - |     - |      24 B |
          */
         public int Utf8WithMemoryPool()
         {
@@ -286,7 +384,7 @@ namespace RefStructs
         
         [Benchmark]
         /* UTF8 ArrayPool result
-         * |  Utf8WithArrayPool | 1.095 us | 0.0215 us | 0.0593 us | 1.066 us |      - |     - |     - |         - |
+         * |  Utf8WithArrayPool | 1,063.9 ns |  28.67 ns |  83.17 ns | 1,013.3 ns |      - |     - |     - |         - |
          */
         public int Utf8WithArrayPool()
         {
